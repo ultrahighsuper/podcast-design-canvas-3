@@ -223,6 +223,76 @@
   });
   setInterval(syncScrub, 200);
 
+  // Captions: import a WebVTT (.vtt) file. Parsed cues live on the episode, so
+  // they survive preset/template switches; the preview burns the active cue into
+  // the canvas (and therefore the export) at its scheduled times.
+  const C = PDC.captions;
+  const captionFileInput = $("caption-file");
+  function showCaptionError(message) {
+    const el = $("caption-error");
+    el.textContent = message || "";
+    el.hidden = !message;
+  }
+  function syncCaptionUi() {
+    const has = C.hasCaptions(episode);
+    const status = $("caption-status");
+    if (has) {
+      const cap = C.getCaptions(episode);
+      status.textContent = "Captions: " + cap.name + " (" + cap.cues.length + " cue" + (cap.cues.length === 1 ? "" : "s") + ")";
+    } else {
+      status.textContent = "";
+    }
+    $("caption-remove").hidden = !has;
+  }
+  // Read the uploaded caption file as text. Prefer Blob.text(); fall back to
+  // FileReader so the caption content loads even where text() is unavailable or
+  // rejects — the file must actually load for any of the caption workflow to run.
+  async function readCaptionText(file) {
+    try {
+      if (file && typeof file.text === "function") return await file.text();
+    } catch (e) {
+      /* fall through to FileReader */
+    }
+    return await new Promise(function (resolve, reject) {
+      if (typeof FileReader === "undefined") {
+        reject(new Error("Could not read the caption file."));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result || "")); };
+      reader.onerror = function () { reject(reader.error || new Error("Could not read the caption file.")); };
+      reader.readAsText(file);
+    });
+  }
+  captionFileInput.addEventListener("change", async function () {
+    const file = captionFileInput.files && captionFileInput.files[0];
+    if (!file) return;
+    let text = "";
+    try {
+      text = await readCaptionText(file);
+    } catch (e) {
+      showCaptionError("Could not read the caption file.");
+      captionFileInput.value = "";
+      return;
+    }
+    const result = C.importVtt(episode, file.name || "captions.vtt", text);
+    captionFileInput.value = "";
+    if (!result.ok) {
+      showCaptionError(result.error || "No captions found in that file.");
+      return;
+    }
+    showCaptionError("");
+    syncCaptionUi();
+    preview.drawFrame();
+  });
+  $("caption-remove").addEventListener("click", function () {
+    C.clearCaptions(episode);
+    captionFileInput.value = "";
+    showCaptionError("");
+    syncCaptionUi();
+    preview.drawFrame();
+  });
+
   const audioButtons = Array.from(document.querySelectorAll("button[data-audio-setting]"));
   const AUDIO_KEYS = ["leveling", "clarity", "noiseReduction"];
   function syncAudioUi() {
@@ -380,6 +450,9 @@
     $("moment-end").value = "";
     showMomentError("");
     renderMomentList();
+    captionFileInput.value = "";
+    showCaptionError("");
+    syncCaptionUi();
 
     $("export-progress").hidden = true;
     $("export-bar").style.width = "0%";
@@ -473,6 +546,7 @@
   SPEAKER_BUCKETS.forEach(updateBucketRow);
   syncAudioUi();
   renderMomentList();
+  syncCaptionUi();
   renderTemplates();
   refresh();
 })();

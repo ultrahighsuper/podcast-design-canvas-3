@@ -26,6 +26,7 @@ const required = {
     "readinessReason",
     "MIN_SPEAKERS",
   ],
+  captions: ["parseVtt", "importVtt", "setCaptions", "clearCaptions", "getCaptions", "hasCaptions", "activeCues", "activeText"],
 };
 
 const missing = [];

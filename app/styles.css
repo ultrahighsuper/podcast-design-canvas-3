@@ -361,6 +361,28 @@ body {
 }
 .moment-remove:hover { color: var(--ink); border-color: var(--muted); }
 
+/* Caption import (WebVTT) -------------------------------------------------- */
+.captions { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.caption-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.caption-upload input[type="file"] { flex: 1; min-width: 0; }
+#caption-remove {
+  background: transparent; border: 1px solid var(--line); color: var(--muted);
+  border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+}
+#caption-remove:hover { color: var(--ink); border-color: var(--muted); }
+#caption-remove[hidden] { display: none; }
+.caption-status { color: var(--ok); font-size: 12px; margin: 6px 0 0; min-height: 14px; flex-basis: 100%; }
+.caption-error { color: #ff8b8b; font-size: 12px; margin: 6px 0 0; min-height: 14px; flex-basis: 100%; }
+.caption-error[hidden] { display: none; }
+
 /* Scrub bar under the transport ------------------------------------------- */
 .scrub-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .scrub-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }

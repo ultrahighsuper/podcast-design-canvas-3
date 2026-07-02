@@ -197,6 +197,7 @@
       });
 
       drawActiveMoments(w, h);
+      drawActiveCaptions(w, h);
 
       canvasEl.dataset.preset = episodeRef.presetId;
       canvasEl.dataset.speakers = String(buckets.length);
@@ -282,6 +283,43 @@
       ctx.strokeStyle = "rgba(255,255,255,0.92)";
       ctx.lineWidth = Math.max(3, Math.round(w * 0.003));
       ctx.strokeRect(x - 1, y - 1, dw + 2, dh + 2);
+    }
+
+    // Imported captions: the cue active at the current reference time is painted
+    // as a centered lower band on the stage canvas, sitting just above the
+    // speaker name tags and below any callout lower-third. Because export records
+    // this same canvas, the caption is burned into the exported video at exactly
+    // its cue times, and because the cue lives on the episode it stays through
+    // preset/template switches. A solid backing bar keeps the text legible over
+    // any layout in screenshots and in the encoded output.
+    function drawActiveCaptions(w, h) {
+      if (!PDC.captions || !episodeRef) return;
+      const text = PDC.captions.activeText(episodeRef, referenceTime);
+      if (!text) return;
+      const lines = text.split("\n").slice(0, 3);
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const fontPx = Math.round(h * 0.05);
+      ctx.font = "600 " + fontPx + "px system-ui, sans-serif";
+      const lineH = Math.round(fontPx * 1.28);
+      let maxTextW = 0;
+      for (const ln of lines) maxTextW = Math.max(maxTextW, ctx.measureText(ln).width);
+      const padX = Math.round(w * 0.022);
+      const padY = Math.round(h * 0.02);
+      const boxW = Math.min(Math.round(w * 0.86), Math.round(maxTextW) + padX * 2);
+      const boxH = lines.length * lineH + padY * 2;
+      const cx = w / 2;
+      const boxBottom = Math.round(h * 0.955);
+      const boxTop = boxBottom - boxH;
+      ctx.fillStyle = "rgba(5, 7, 12, 0.82)";
+      ctx.fillRect(Math.round(cx - boxW / 2), boxTop, boxW, boxH);
+      ctx.fillStyle = "#ffffff";
+      lines.forEach(function (ln, idx) {
+        const ly = boxTop + padY + lineH * idx + lineH / 2;
+        ctx.fillText(ln, cx, ly, boxW - padX * 2);
+      });
+      ctx.restore();
     }
 
     function loop() {
