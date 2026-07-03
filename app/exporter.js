@@ -90,6 +90,18 @@
     return Math.max(min, Math.min(max, v));
   }
 
+  // Creator-facing "Leveling" is a loudness knob: a stronger choice balances the
+  // episode toward a fuller, more consistent, audibly louder mix. We express that
+  // as a makeup gain applied after the (level-reducing) compressor, so the
+  // exported audio's overall loudness measurably tracks the selected leveling —
+  // Off (no change) < Balanced < Strong. This is what makes the audio-quality
+  // choice actually, measurably change the exported audio instead of being a
+  // near-inaudible spectral tweak on typical speech.
+  const LEVELING_MAKEUP = { off: 1, balanced: 1.7, strong: 2.6 };
+  function levelingMakeup(leveling) {
+    return LEVELING_MAKEUP[leveling] != null ? LEVELING_MAKEUP[leveling] : LEVELING_MAKEUP.balanced;
+  }
+
   async function computeLevelingGains(ctx, taps, audioQuality) {
     const leveling = (audioQuality && audioQuality.leveling) || "balanced";
     if (leveling === "off" || taps.length < 2) {
@@ -143,6 +155,13 @@
       current.connect(comp);
       current = comp;
     }
+    // Loudness makeup for the leveling choice (see levelingMakeup): applied last
+    // so it compensates the compressor's gain reduction and lifts the whole mix,
+    // making Off < Balanced < Strong a measurable loudness ladder in the export.
+    const makeup = ctx.createGain();
+    makeup.gain.value = levelingMakeup(q.leveling);
+    current.connect(makeup);
+    current = makeup;
     current.connect(dest);
     tap.gain.connect(root);
     return root;
