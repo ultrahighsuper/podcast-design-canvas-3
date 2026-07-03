@@ -506,9 +506,10 @@
   const templatesEl = $("templates");
   const editor = PDC.editor.createEditor({
     overlayEl: $("edit-overlay"),
-    onChange: function (rects) {
-      // Live: feed the dragged/resized rects to the preview as a draft layout.
-      PDC.templates.setDraft(rects);
+    onChange: function (rects, layers) {
+      // Live: feed the dragged/resized speaker rects AND non-video design layers
+      // to the preview as a draft layout so both render immediately.
+      PDC.templates.setDraft(rects, layers);
       setPreset(episode, PDC.templates.DRAFT_ID);
       preview.render(episode);
     },
@@ -565,7 +566,8 @@
     layoutBeforeEdit = episode.presetId;
     const buckets = assignedBuckets(episode);
     const initial = PDC.templates.resolveLayout(episode, buckets.length);
-    editor.open(buckets, initial, function (b) { return speakerName(episode, b); });
+    const initialLayers = PDC.templates.resolveLayers(episode);
+    editor.open(buckets, initial, function (b) { return speakerName(episode, b); }, initialLayers);
     $("customize-edit").hidden = false;
     $("customize-hint").hidden = false;
     $("customize").textContent = "✎ Editing layout";
@@ -583,6 +585,12 @@
   }
 
   $("customize").addEventListener("click", openEditor);
+  $("add-shape-layer").addEventListener("click", function () {
+    if (editor.isOpen()) editor.addLayer("shape");
+  });
+  $("add-title-layer").addEventListener("click", function () {
+    if (editor.isOpen()) editor.addLayer("title");
+  });
   $("cancel-customize").addEventListener("click", function () {
     const prev = layoutBeforeEdit || PRESETS[0].id;
     closeEditor();
@@ -590,7 +598,7 @@
   });
   $("save-template").addEventListener("click", function () {
     const name = ($("template-name").value || "").trim() || "Custom layout";
-    const t = PDC.templates.saveTemplate(name, editor.getRects());
+    const t = PDC.templates.saveTemplate(name, editor.getRects(), editor.getLayers());
     $("template-name").value = "";
     closeEditor();
     renderTemplates();

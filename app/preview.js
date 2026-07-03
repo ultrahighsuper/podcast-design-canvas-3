@@ -172,9 +172,15 @@
         : (getPreset(episodeRef.presetId) || PDC.presets.PRESETS[0]).layout(buckets.length);
       const w = canvasEl.width;
       const h = canvasEl.height;
+      const layers = PDC.templates && PDC.templates.resolveLayers ? PDC.templates.resolveLayers(episodeRef) : [];
 
       ctx.fillStyle = "#05070c";
       ctx.fillRect(0, 0, w, h);
+
+      // Non-video layers with z < 0 render BEHIND the speaker videos (backgrounds
+      // and accent blocks); layers with z >= 0 render ABOVE them (framing, title
+      // placeholders). Export records this same canvas, so saved layers burn in.
+      layers.filter(function (l) { return l.z < 0; }).forEach(function (l) { drawLayer(l, w, h); });
 
       buckets.forEach(function (bucket, i) {
         const rect = rects[i] || rects[rects.length - 1];
@@ -222,13 +228,44 @@
         }
       });
 
+      layers.filter(function (l) { return l.z >= 0; }).forEach(function (l) { drawLayer(l, w, h); });
+
       drawActiveMoments(w, h);
 
       canvasEl.dataset.preset = episodeRef.presetId;
       canvasEl.dataset.speakers = String(buckets.length);
+      canvasEl.dataset.layers = String(layers.length);
       canvasEl.dataset.caption = (PDC.moments &&
         PDC.moments.activeMoments(episodeRef, referenceTime).some(function (m) { return m.type === "caption"; }))
         ? "1" : "0";
+    }
+
+    // A reusable non-video design layer from the selected custom template: a
+    // solid "shape" color block, or a "title" placeholder box with text. Drawn
+    // in stage-percent geometry so it lands identically in preview and export.
+    function drawLayer(layer, w, h) {
+      const x = (layer.x / 100) * w;
+      const y = (layer.y / 100) * h;
+      const rw = (layer.w / 100) * w;
+      const rh = (layer.h / 100) * h;
+      if (layer.kind === "title") {
+        ctx.fillStyle = layer.color || "#0b1020";
+        ctx.globalAlpha = 0.86;
+        ctx.fillRect(x, y, rw, rh);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 1, y + 1, rw - 2, rh - 2);
+        const text = layer.text || "Title";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "700 " + Math.max(14, Math.round(rh * 0.46)) + "px system-ui, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, x + Math.round(w * 0.012), y + rh / 2, rw - Math.round(w * 0.024));
+      } else {
+        ctx.fillStyle = layer.color || "#ff2d95";
+        ctx.fillRect(x, y, rw, rh);
+      }
     }
 
     // Timed visual moments are painted straight onto the stage canvas, over the

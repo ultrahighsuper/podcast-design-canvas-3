@@ -36,6 +36,33 @@
     return clean;
   }
 
+  // Non-video design layers a creator can add to a custom layout: a "shape"
+  // (solid color block, e.g. a background or accent band) and a "title" (a
+  // title/caption placeholder box with text). Layers carry a z value — negative
+  // renders BEHIND the speaker videos, non-negative renders ABOVE them — so the
+  // creator can frame or back the speakers. Only geometry/appearance is stored,
+  // so a saved template's layers reapply to any future episode.
+  const LAYER_KINDS = ["shape", "title"];
+  let layerSeq = 0;
+  const HEX = /^#[0-9a-fA-F]{3,8}$/;
+
+  function normalizeLayer(layer) {
+    const l = layer || {};
+    const kind = LAYER_KINDS.indexOf(l.kind) !== -1 ? l.kind : "shape";
+    const rect = normalizeRect(l);
+    const z = Number.isFinite(Number(l.z)) ? Number(l.z) : kind === "title" ? 1 : -1;
+    const color = typeof l.color === "string" && HEX.test(l.color)
+      ? l.color
+      : kind === "title" ? "#0b1020" : "#ff2d95";
+    const text = kind === "title" ? String(l.text == null ? "Title" : l.text).slice(0, 80).trim() || "Title" : "";
+    const id = typeof l.id === "string" && l.id ? l.id : "layer-" + ++layerSeq;
+    return { id, kind, x: rect.x, y: rect.y, w: rect.w, h: rect.h, z, color, text };
+  }
+
+  function normalizeLayers(layers) {
+    return (Array.isArray(layers) ? layers : []).map(normalizeLayer);
+  }
+
   // Best-effort read of whatever was saved last session. A missing/unavailable
   // store (private browsing, disabled storage, first run) or corrupt JSON just
   // means an empty template list — never a crash.
@@ -48,7 +75,7 @@
       if (!Array.isArray(parsed)) return [];
       return parsed
         .filter((t) => t && typeof t.id === "string" && typeof t.name === "string" && t.rects && typeof t.rects === "object")
-        .map((t) => ({ id: t.id, name: t.name, rects: normalizeRects(t.rects) }));
+        .map((t) => ({ id: t.id, name: t.name, rects: normalizeRects(t.rects), layers: normalizeLayers(t.layers) }));
     } catch (e) {
       return [];
     }
@@ -78,8 +105,8 @@
   const getTemplate = (id) => (id === DRAFT_ID ? draft : templates.find((t) => t.id === id) || null);
   const listTemplates = () => templates.slice();
 
-  function setDraft(rects) {
-    draft = { id: DRAFT_ID, name: "Custom (editing)", rects: normalizeRects(rects) };
+  function setDraft(rects, layers) {
+    draft = { id: DRAFT_ID, name: "Custom (editing)", rects: normalizeRects(rects), layers: normalizeLayers(layers) };
     return draft;
   }
   function clearDraft() {
@@ -87,12 +114,13 @@
   }
 
   // Persist a layout as a named, reusable template; returns the stored template.
-  // Only geometry is stored — never the media that happened to be loaded when
-  // the creator saved it — so the template is safe to reuse in any future episode.
-  function saveTemplate(name, rects) {
+  // Only geometry/appearance is stored — the speaker rects AND any non-video
+  // design layers — never the media that happened to be loaded when the creator
+  // saved it, so the template is safe to reuse in any future episode.
+  function saveTemplate(name, rects, layers) {
     const id = "tpl-" + ++seq;
     const trimmed = String(name == null ? "" : name).trim();
-    const template = { id, name: trimmed || "Custom " + seq, rects: normalizeRects(rects) };
+    const template = { id, name: trimmed || "Custom " + seq, rects: normalizeRects(rects), layers: normalizeLayers(layers) };
     templates.push(template);
     persist();
     return template;
@@ -114,5 +142,20 @@
     return preset.layout(n);
   }
 
-  PDC.templates = { isTemplate, getTemplate, listTemplates, saveTemplate, resolveLayout, normalizeRect, setDraft, clearDraft, DRAFT_ID };
+  // The non-video layers for whatever layout the episode currently selects — a
+  // custom template (or the live editing draft) carries them; a built-in preset
+  // has none. Returned as copies so callers can't mutate the stored template.
+  function resolveLayers(episode) {
+    const id = episode && episode.presetId;
+    if (isTemplate(id)) {
+      const t = getTemplate(id);
+      if (t && Array.isArray(t.layers)) return t.layers.map((l) => Object.assign({}, l));
+    }
+    return [];
+  }
+
+  PDC.templates = {
+    isTemplate, getTemplate, listTemplates, saveTemplate, resolveLayout, resolveLayers,
+    normalizeRect, normalizeLayer, LAYER_KINDS, setDraft, clearDraft, DRAFT_ID,
+  };
 })();

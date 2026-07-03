@@ -138,3 +138,60 @@ test("the draft layout renders live and clears cleanly", () => {
   rects = PDC.templates.resolveLayout(ep, 2);
   assert.deepEqual(rects, PDC.presets.PRESETS[0].layout(2));
 });
+
+// --- Non-video design layers (issue #211) ----------------------------------
+
+test("saveTemplate stores non-video layers and resolveLayers returns them", () => {
+  const PDC = loadPDC(root);
+  const t = PDC.templates.saveTemplate("With layers",
+    { host: { x: 0, y: 0, w: 50, h: 100 } },
+    [
+      { kind: "shape", x: 5, y: 5, w: 40, h: 30, z: -1, color: "#ff2d95" },
+      { kind: "title", x: 20, y: 10, w: 60, h: 16, z: 1, text: "My Title" },
+    ]);
+  const ep = PDC.episode.createEpisode({});
+  PDC.episode.setPreset(ep, t.id);
+  const layers = PDC.templates.resolveLayers(ep);
+  assert.equal(layers.length, 2);
+  assert.equal(layers[0].kind, "shape");
+  assert.equal(layers[0].z, -1, "shape defaults behind");
+  assert.equal(layers[1].kind, "title");
+  assert.equal(layers[1].text, "My Title");
+  assert.equal(layers[1].z, 1, "title in front");
+});
+
+test("built-in presets carry no layers; templates without layers resolve to []", () => {
+  const PDC = loadPDC(root);
+  const ep = PDC.episode.createEpisode({});
+  assert.deepEqual(PDC.templates.resolveLayers(ep), [], "default preset has no layers");
+  const t = PDC.templates.saveTemplate("No layers", { host: { x: 0, y: 0, w: 100, h: 100 } });
+  PDC.episode.setPreset(ep, t.id);
+  assert.deepEqual(PDC.templates.resolveLayers(ep), []);
+});
+
+test("normalizeLayer clamps geometry, validates kind/color, and fills defaults", () => {
+  const PDC = loadPDC(root);
+  const shape = PDC.templates.normalizeLayer({ kind: "bogus", x: -20, y: 200, w: 500, h: 2, color: "not-a-color" });
+  assert.equal(shape.kind, "shape", "unknown kind falls back to shape");
+  assert.ok(shape.x >= 0 && shape.x <= 100 && shape.w >= 8 && shape.w <= 100, "geometry clamped");
+  assert.match(shape.color, /^#/, "invalid color replaced with a default hex");
+  const title = PDC.templates.normalizeLayer({ kind: "title", text: "  Hello  " });
+  assert.equal(title.text, "Hello");
+  assert.equal(title.z, 1, "title defaults to front");
+});
+
+test("saved layers survive a reload (persisted with the template)", () => {
+  const store = (() => {
+    let data = {};
+    return { getItem: (k) => (k in data ? data[k] : null), setItem: (k, v) => { data[k] = String(v); }, removeItem: (k) => { delete data[k]; } };
+  })();
+  const first = loadPDC(root, { localStorage: store });
+  const t = first.templates.saveTemplate("Persist layers",
+    { host: { x: 0, y: 0, w: 50, h: 100 } },
+    [{ kind: "shape", x: 10, y: 10, w: 30, h: 30, z: 1, color: "#ff2d95" }]);
+  const reloaded = loadPDC(root, { localStorage: store });
+  const survived = reloaded.templates.listTemplates().find((x) => x.id === t.id);
+  assert.ok(survived, "template survived reload");
+  assert.equal(survived.layers.length, 1, "its layer survived reload");
+  assert.equal(survived.layers[0].kind, "shape");
+});
