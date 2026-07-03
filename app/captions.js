@@ -82,32 +82,134 @@
     return M ? M.listMoments(episode).filter((m) => m.type === "caption") : [];
   }
 
+  // --- Social-context spelling correction --------------------------------
+  // Speaker/person names entered via social links are the best cheap signal we
+  // have for how names in a transcript SHOULD be spelled. We use them to fix
+  // obvious misspellings of those names in imported caption text — no network,
+  // no third-party accounts, just the derived handles the creator already gave.
+
+  // Classic Levenshtein edit distance (insert/delete/substitute), used to decide
+  // whether a transcript word is a close misspelling of a known name.
+  function levenshtein(a, b) {
+    a = String(a); b = String(b);
+    const m = a.length, n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    let prev = new Array(n + 1);
+    for (let j = 0; j <= n; j++) prev[j] = j;
+    for (let i = 1; i <= m; i++) {
+      const cur = [i];
+      for (let j = 1; j <= n; j++) {
+        const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      }
+      prev = cur;
+    }
+    return prev[n];
+  }
+
+  // Make a corrected name echo the misspelled token's capitalization: ALL CAPS
+  // stays all caps, a Leading-cap token gets a leading-cap name, else lowercase.
+  function matchCase(token, name) {
+    if (token.length > 1 && token === token.toUpperCase() && token !== token.toLowerCase()) {
+      return name.toUpperCase();
+    }
+    const first = token.charAt(0);
+    if (first !== first.toLowerCase() && first === first.toUpperCase()) {
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+    return name;
+  }
+
+  // Candidate name spellings from one handle: the whole alpha handle plus any
+  // camelCase / separator sub-words (e.g. "sarah-chen", "sarahChen" -> "sarah",
+  // "chen", and "sarahchen"). Only tokens of length >= 3 are usable targets.
+  function nameCandidatesFromHandle(handle) {
+    const h = String(handle || "");
+    const out = new Set();
+    const whole = h.replace(/[^A-Za-z]/g, "");
+    if (whole.length >= 3) out.add(whole);
+    const spaced = h.replace(/([a-z])([A-Z])/g, "$1 $2");
+    spaced.split(/[^A-Za-z]+/).forEach((p) => { if (p.length >= 3) out.add(p); });
+    return [...out];
+  }
+
+  // The known speaker/person names for this episode, derived from the social
+  // links the creator entered (only buckets that actually have a link). These
+  // are the spellings captions should be normalized toward.
+  function speakerNames(episode) {
+    const E = PDC.episode, P = PDC.presets;
+    if (!E || !P || !P.SPEAKER_BUCKETS) return [];
+    const set = new Set();
+    P.SPEAKER_BUCKETS.forEach((bucket) => {
+      const link = E.getSocialLink ? E.getSocialLink(episode, bucket) : "";
+      if (!link) return;
+      const handle = E.deriveHandle ? E.deriveHandle(link) : "";
+      nameCandidatesFromHandle(handle).forEach((n) => set.add(n));
+    });
+    return [...set];
+  }
+
+  // Normalize obvious misspellings of the known names inside a caption string.
+  // Each alphabetic word close (small edit distance, bounded by name length) to
+  // a known name — but not already correct — is replaced with the correct name,
+  // keeping the original word's capitalization. Exact matches and unrelated
+  // words are left untouched, so ordinary transcript text is never mangled.
+  function correctSpelling(text, names) {
+    const list = (names || []).filter((n) => typeof n === "string" && n.length >= 3);
+    if (!list.length) return String(text == null ? "" : text);
+    return String(text == null ? "" : text).replace(/[A-Za-z][A-Za-z'’]*/g, function (token) {
+      const lower = token.toLowerCase();
+      let best = null;
+      let bestDist = Infinity;
+      for (const name of list) {
+        const nl = name.toLowerCase();
+        if (nl.length < 3) continue;
+        if (lower === nl) return token; // already spelled correctly — leave it
+        if (Math.abs(lower.length - nl.length) > 2) continue;
+        const maxDist = nl.length <= 4 ? 1 : nl.length <= 7 ? 2 : 3;
+        const d = levenshtein(lower, nl);
+        if (d >= 1 && d <= maxDist && d < bestDist) { best = name; bestDist = d; }
+      }
+      return best ? matchCase(token, best) : token;
+    });
+  }
+
   // Import a WebVTT/SRT transcript as timed CAPTION MOMENTS on the episode.
   // Replaces any previously-imported caption moments (so re-importing is
   // idempotent) but leaves manual title/callout/image moments — and every other
   // piece of episode state (uploaded media, preset, social links) — untouched.
+  // Caption text is first normalized against the speaker names derived from the
+  // creator's social links, so obvious name misspellings are corrected in the
+  // caption moments that drive both the preview and the exported video.
   // On invalid/empty input it changes NOTHING and returns a creator-readable
   // reason, so a bad file can never wipe the creator's work.
   function importCaptionMoments(episode, text) {
     const parsed = parseTranscript(text);
     if (parsed.error || !parsed.cues.length) {
-      return { ok: false, count: 0, error: parsed.error || "No caption cues were found." };
+      return { ok: false, count: 0, corrected: 0, error: parsed.error || "No caption cues were found." };
     }
     const M = PDC.moments;
-    if (!M) return { ok: false, count: 0, error: "Moments system unavailable." };
+    if (!M) return { ok: false, count: 0, corrected: 0, error: "Moments system unavailable." };
+    const names = speakerNames(episode);
     // Only replace previously-imported caption moments; keep all other moments.
     captionMoments(episode).forEach((m) => M.removeMoment(episode, m.id));
     let count = 0;
+    let corrected = 0;
     parsed.cues.forEach((c) => {
-      if (M.addMoment(episode, { type: "caption", text: c.text, start: c.start, end: c.end })) count++;
+      const fixed = correctSpelling(c.text, names);
+      if (fixed !== c.text) corrected++;
+      if (M.addMoment(episode, { type: "caption", text: fixed, start: c.start, end: c.end })) count++;
     });
-    return { ok: count > 0, count, error: count ? "" : "No usable caption cues were found." };
+    return { ok: count > 0, count, corrected, error: count ? "" : "No usable caption cues were found." };
   }
 
   PDC.captions = {
     parseTimestamp,
     parseTranscript,
     captionMoments,
+    speakerNames,
+    correctSpelling,
     importCaptionMoments,
   };
 })();

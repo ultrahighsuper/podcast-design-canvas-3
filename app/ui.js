@@ -231,7 +231,10 @@
       return false;
     }
     showCaptionError("");
-    setCaptionStatus(result.count + " caption moment" + (result.count === 1 ? "" : "s") + " imported" + (sourceLabel ? " from " + sourceLabel : "") + " — see the list below.");
+    const correctedNote = result.corrected
+      ? " Corrected " + result.corrected + " caption" + (result.corrected === 1 ? "" : "s") + " using social-context names."
+      : "";
+    setCaptionStatus(result.count + " caption moment" + (result.count === 1 ? "" : "s") + " imported" + (sourceLabel ? " from " + sourceLabel : "") + " — see the list below." + correctedNote);
     renderMomentList();
     // Jump the timeline onto the first caption so it is immediately visible.
     const caps = C.captionMoments(episode);

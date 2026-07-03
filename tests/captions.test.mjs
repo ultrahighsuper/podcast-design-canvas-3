@@ -140,3 +140,69 @@ test("resetEpisode clears imported caption moments", () => {
   E.resetEpisode(ep, { title: "fresh" });
   assert.equal(C.captionMoments(ep).length, 0);
 });
+
+// --- Social-context spelling correction (issue #172) -----------------------
+
+test("speakerNames derives correction targets only from buckets that have a link", () => {
+  const ep = E.createEpisode({});
+  assert.deepEqual(C.speakerNames(ep), [], "no links -> no names");
+  E.setSocialLink(ep, "host", "https://x.com/marcus");
+  E.setSocialLink(ep, "guest1", "@priya");
+  const names = C.speakerNames(ep);
+  assert.ok(names.includes("marcus"), "host handle derived");
+  assert.ok(names.includes("priya"), "guest handle derived");
+});
+
+test("speakerNames splits camelCase / separated handles into name candidates", () => {
+  const ep = E.createEpisode({});
+  E.setSocialLink(ep, "host", "https://www.linkedin.com/in/sarah-chen");
+  const names = C.speakerNames(ep);
+  assert.ok(names.includes("sarah") && names.includes("chen"), "sub-names derived: " + names.join(","));
+});
+
+test("correctSpelling fixes obvious misspellings and keeps capitalization", () => {
+  const names = ["marcus", "priya"];
+  assert.equal(C.correctSpelling("Welcome Marcuss to the show", names), "Welcome Marcus to the show");
+  assert.equal(C.correctSpelling("Thanks Prya for joining", names), "Thanks Priya for joining");
+  assert.equal(C.correctSpelling("MARCAS is here", names), "MARCUS is here", "all-caps stays all-caps");
+});
+
+test("correctSpelling leaves correct spellings and unrelated words untouched", () => {
+  const names = ["marcus", "priya"];
+  assert.equal(C.correctSpelling("Marcus and Priya discuss markets", names), "Marcus and Priya discuss markets");
+  assert.equal(C.correctSpelling("the show was great", names), "the show was great", "no over-correction");
+  assert.equal(C.correctSpelling("anything", []), "anything", "no names -> no change");
+});
+
+test("importCaptionMoments corrects caption text from social links, and reports how many", () => {
+  const ep = E.createEpisode({});
+  E.setSocialLink(ep, "host", "https://x.com/marcus");
+  E.setSocialLink(ep, "guest1", "https://x.com/priya");
+  const vtt = [
+    "WEBVTT",
+    "",
+    "00:00:00.000 --> 00:00:03.000",
+    "Welcome Marcuss to the podcast",
+    "",
+    "00:00:04.000 --> 00:00:07.000",
+    "Great to have you Prya",
+    "",
+  ].join("\n");
+  const result = C.importCaptionMoments(ep, vtt);
+  assert.equal(result.ok, true);
+  assert.equal(result.count, 2);
+  assert.equal(result.corrected, 2, "both cues had a corrected name");
+  const caps = C.captionMoments(ep);
+  assert.deepEqual(caps.map((m) => m.text), ["Welcome Marcus to the podcast", "Great to have you Priya"]);
+  // The corrected text is what renders and survives a preset switch.
+  E.setPreset(ep, "spotlight");
+  assert.equal(C.captionMoments(ep)[0].text, "Welcome Marcus to the podcast");
+});
+
+test("importCaptionMoments without social links imports transcript text verbatim", () => {
+  const ep = E.createEpisode({});
+  const vtt = "WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nWelcome Marcuss to the podcast";
+  const result = C.importCaptionMoments(ep, vtt);
+  assert.equal(result.corrected, 0);
+  assert.equal(C.captionMoments(ep)[0].text, "Welcome Marcuss to the podcast", "no links -> no correction");
+});
