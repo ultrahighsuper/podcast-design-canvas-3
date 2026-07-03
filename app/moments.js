@@ -38,36 +38,54 @@
     return m + ":" + String(s).padStart(2, "0");
   }
 
+  // Resolve end time from an explicit end OR start + duration (seconds / M:SS).
+  function resolveEnd(fields, start) {
+    const endStr = String(fields.end == null ? "" : fields.end).trim();
+    if (endStr) return parseTime(fields.end);
+    const durStr = String(fields.duration == null ? "" : fields.duration).trim();
+    if (!durStr) return NaN;
+    const dur = parseTime(fields.duration);
+    if (!Number.isFinite(dur) || dur <= 0) return NaN;
+    return start + dur;
+  }
+
   // "" when the fields describe a valid moment, otherwise a creator-readable
-  // reason. start/end may be raw strings (seconds or M:SS) or numbers.
+  // reason. start/end may be raw strings (seconds or M:SS) or numbers; duration
+  // may be used instead of end (end = start + duration).
   function validateMoment(fields) {
     const f = fields || {};
-    if (!MOMENT_TYPES.includes(f.type)) return "Choose a moment type (title, callout, or b-roll image).";
+    if (!MOMENT_TYPES.includes(f.type)) return "Choose a moment type (title, callout, caption, or b-roll image).";
     if (f.type === "image") {
       if (!String(f.imageName == null ? "" : f.imageName).trim()) return "Upload a PNG image for this b-roll moment.";
     } else if (!String(f.text == null ? "" : f.text).trim()) {
       return "Enter the text this moment should display.";
     }
     const start = parseTime(f.start);
-    const end = parseTime(f.end);
+    const end = resolveEnd(f, start);
     if (!Number.isFinite(start)) return "Enter a valid start time (seconds or M:SS).";
-    if (!Number.isFinite(end)) return "Enter a valid end time (seconds or M:SS).";
+    const hasEnd = String(f.end == null ? "" : f.end).trim();
+    const hasDur = String(f.duration == null ? "" : f.duration).trim();
+    if (!hasEnd && !hasDur) return "Enter a duration in seconds or an end time.";
+    if (!Number.isFinite(end)) return hasDur ? "Enter a valid duration in seconds." : "Enter a valid end time (seconds or M:SS).";
     if (start < 0) return "Start time cannot be negative.";
-    if (end <= start) return "End time must be after the start time.";
+    if (end <= start) return "Duration/end must place the moment after its start time.";
     return "";
   }
 
   // Adds a validated moment to the episode and returns it; returns null when
   // the fields are invalid (use validateMoment for the reason).
   function addMoment(episode, fields) {
-    if (validateMoment(fields)) return null;
+    const problem = validateMoment(fields);
+    if (problem) return null;
+    const start = parseTime(fields.start);
+    const end = resolveEnd(fields, start);
     const moment = {
       id: "moment-" + ++seq,
       type: fields.type,
       text: fields.type === "image" ? "" : String(fields.text).trim(),
       imageName: fields.type === "image" ? String(fields.imageName || "").trim() : "",
-      start: parseTime(fields.start),
-      end: parseTime(fields.end),
+      start: start,
+      end: end,
     };
     ensureMoments(episode).push(moment);
     return moment;
@@ -122,6 +140,7 @@
     parseTime,
     formatTime,
     validateMoment,
+    resolveEnd,
     addMoment,
     removeMoment,
     updateMoment,

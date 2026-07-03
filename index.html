@@ -95,7 +95,7 @@
         </div>
 
         <h2 class="step-title"><span class="num">4</span> Add timed visual moments</h2>
-        <p class="hint">Schedule an episode title, callout/reference, b-roll image, or caption to appear over the composed preview — and the exported video — only during its time range (seconds or M:SS). Or import a whole transcript as timed captions below.</p>
+        <p class="hint">Add timed <strong>Title</strong> and <strong>Callout</strong> text moments (start + duration in seconds), or schedule b-roll images and import transcript captions below.</p>
         <div class="moments" id="moments">
           <div class="moment-form">
             <select id="moment-type" aria-label="Moment type">
@@ -109,8 +109,9 @@
               <span>PNG image</span>
               <input id="moment-image" type="file" accept="image/png,.png" aria-label="B-roll PNG image" />
             </label>
-            <input id="moment-start" type="text" inputmode="numeric" placeholder="Start (0:00)" aria-label="Moment start time" autocomplete="off" />
-            <input id="moment-end" type="text" inputmode="numeric" placeholder="End (0:03)" aria-label="Moment end time" autocomplete="off" />
+            <input id="moment-start" type="text" inputmode="numeric" placeholder="Start (1)" aria-label="Moment start time" autocomplete="off" />
+            <input id="moment-duration" type="text" inputmode="numeric" placeholder="Duration (2)" aria-label="Moment duration in seconds" autocomplete="off" />
+            <input id="moment-end" type="text" inputmode="numeric" placeholder="Or end (0:03)" aria-label="Moment end time" autocomplete="off" />
             <button id="moment-add" type="button">+ Add moment</button>
           </div>
           <p class="moment-image-status" id="moment-image-status" aria-live="polite"></p>

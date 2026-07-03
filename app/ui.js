@@ -209,6 +209,7 @@
       text: $("moment-text").value,
       imageName: preparedMomentImage && preparedMomentImage.name,
       start: $("moment-start").value,
+      duration: $("moment-duration").value,
       end: $("moment-end").value,
     };
     const problem = M.validateMoment(fields);
@@ -234,9 +235,10 @@
     $("moment-image").value = "";
     setMomentImageStatus("");
     $("moment-start").value = "";
+    $("moment-duration").value = "";
     $("moment-end").value = "";
     renderMomentList();
-    if (moment && moment.type === "image") {
+    if (moment && (moment.type === "image" || moment.type === "title" || moment.type === "callout")) {
       const t = Math.min(moment.end - 0.05, moment.start + Math.min(0.5, Math.max(0.1, (moment.end - moment.start) / 2)));
       preview.seekTo(t);
     } else {
@@ -489,6 +491,7 @@
     document.querySelectorAll("input[data-link-bucket]").forEach(function (input) { input.value = ""; });
     $("moment-text").value = "";
     $("moment-start").value = "";
+    $("moment-duration").value = "";
     $("moment-end").value = "";
     showMomentError("");
     $("caption-file").value = "";

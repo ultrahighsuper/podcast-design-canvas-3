@@ -44,6 +44,10 @@ if (!html.includes('data-file-bucket="host"')) {
   console.error("preview-build: index.html must declare static speaker upload inputs");
   process.exit(1);
 }
+if (!html.includes('id="moment-duration"')) {
+  console.error("preview-build: index.html must declare the moment duration input");
+  process.exit(1);
+}
 if (!html.includes('id="moment-image"')) {
   console.error("preview-build: index.html must declare the b-roll PNG upload input");
   process.exit(1);

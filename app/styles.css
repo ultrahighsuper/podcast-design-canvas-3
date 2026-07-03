@@ -293,6 +293,7 @@ body {
 .moment-form #moment-text { grid-column: span 4; }
 .moment-form .moment-image-field { grid-column: span 4; }
 .moment-form #moment-start,
+.moment-form #moment-duration,
 .moment-form #moment-end,
 .moment-form #moment-add { grid-column: span 2; }
 .moment-form select,

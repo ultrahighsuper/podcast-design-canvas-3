@@ -26,6 +26,8 @@ const required = {
     "readinessReason",
     "MIN_SPEAKERS",
   ],
+  moments: ["parseTime", "formatTime", "validateMoment", "resolveEnd", "addMoment", "removeMoment", "listMoments", "activeMoments"],
+  captions: ["parseTranscript", "importCaptionMoments", "captionMoments"],
 };
 
 const missing = [];

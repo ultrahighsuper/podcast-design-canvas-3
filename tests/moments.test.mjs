@@ -147,7 +147,27 @@ test("overlapping moments are both active inside the overlap", () => {
   assert.deepEqual(M.activeMoments(ep, 6).map((m) => m.text), ["C"]);
 });
 
-test("moments live on the episode and survive preset and template switches", () => {
+test("validateMoment accepts start + duration instead of end", () => {
+  assert.equal(M.validateMoment({ type: "title", text: "EP", start: 1, duration: 2 }), "");
+  assert.equal(M.validateMoment({ type: "callout", text: "Ref", start: 4, duration: 2 }), "");
+  assert.match(M.validateMoment({ type: "title", text: "x", start: 1 }), /duration|end/i);
+  assert.match(M.validateMoment({ type: "title", text: "x", start: 1, duration: 0 }), /after|duration/i);
+});
+
+test("addMoment stores end computed from start + duration", () => {
+  const ep = E.createEpisode({});
+  const title = M.addMoment(ep, { type: "title", text: "SEGMENT OPENER", start: 1, duration: 2 });
+  assert.equal(title.start, 1);
+  assert.equal(title.end, 3);
+  const callout = M.addMoment(ep, { type: "callout", text: "KEY QUOTE", start: 4, duration: 2 });
+  assert.equal(callout.start, 4);
+  assert.equal(callout.end, 6);
+  assert.deepEqual(M.activeMoments(ep, 2).map((m) => m.type), ["title"]);
+  assert.deepEqual(M.activeMoments(ep, 5).map((m) => m.type), ["callout"]);
+  assert.deepEqual(M.activeMoments(ep, 7), []);
+});
+
+test("title and callout moments survive preset switches alongside captions", () => {
   const ep = E.createEpisode({});
   M.addMoment(ep, { type: "title", text: "EP TITLE", start: 0, end: 3 });
   M.addMoment(ep, { type: "callout", text: "CALLOUT REF", start: 4, end: 7 });
