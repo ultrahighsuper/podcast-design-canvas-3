@@ -142,6 +142,14 @@
       comp.release.value = q.leveling === "strong" ? 0.3 : 0.22;
       current.connect(comp);
       current = comp;
+      // Make-up gain: compression lowers peaks, so without it "leveling" would
+      // just make the episode quieter (the opposite of what a creator expects).
+      // Restoring level here makes the leveled result audibly fuller than the
+      // unprocessed "off" choice, so the control has a clear, correct effect.
+      const makeup = ctx.createGain();
+      makeup.gain.value = q.leveling === "strong" ? 2.1 : 1.5;
+      current.connect(makeup);
+      current = makeup;
     }
     current.connect(dest);
     tap.gain.connect(root);
