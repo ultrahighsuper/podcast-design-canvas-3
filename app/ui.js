@@ -133,9 +133,54 @@
         renderMomentList();
         preview.drawFrame();
       });
-      li.append(kind, text, range, remove);
+      // Text-bearing moments (title / callout / caption) can have their text
+      // edited in place — a b-roll image has no text to edit, only its timing.
+      if (m.type !== "image") {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "moment-edit";
+        edit.textContent = "Edit";
+        edit.setAttribute("aria-label", "Edit " + m.type + " moment text");
+        edit.addEventListener("click", function () { beginEditMoment(li, text, m); });
+        li.append(kind, text, range, edit, remove);
+      } else {
+        li.append(kind, text, range, remove);
+      }
       list.appendChild(li);
     });
+  }
+
+  // Swap a moment row's text label for an inline input + Save, so a creator can
+  // fix a title or callout without deleting and re-adding it. Enter or Save
+  // commits via M.updateMoment and repaints the preview so the edited text shows
+  // at its scheduled time immediately; Escape or an empty value cancels.
+  function beginEditMoment(li, textSpan, m) {
+    if (li.querySelector(".moment-edit-input")) return;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "moment-edit-input";
+    input.value = m.text;
+    input.setAttribute("aria-label", "Edit moment text");
+    const save = document.createElement("button");
+    save.type = "button";
+    save.className = "moment-edit-save";
+    save.textContent = "Save";
+    save.setAttribute("aria-label", "Save moment text");
+    function commit() {
+      const val = input.value.trim();
+      if (!val) { input.focus(); return; }
+      M.updateMoment(episode, m.id, { text: val });
+      renderMomentList();
+      preview.drawFrame();
+    }
+    save.addEventListener("click", commit);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); commit(); }
+      else if (e.key === "Escape") { e.preventDefault(); renderMomentList(); }
+    });
+    textSpan.replaceWith(input);
+    li.insertBefore(save, li.querySelector(".moment-edit"));
+    input.focus();
   }
   $("moment-image").addEventListener("change", function () {
     const file = $("moment-image").files && $("moment-image").files[0];

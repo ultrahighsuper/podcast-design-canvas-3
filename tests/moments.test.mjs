@@ -28,6 +28,37 @@ test("parseTime rejects non-times", () => {
   }
 });
 
+test("updateMoment edits a title/callout moment's text in place", () => {
+  const ep = E.createEpisode({});
+  const title = M.addMoment(ep, { type: "title", text: "Old title", start: 1, end: 3 });
+  const callout = M.addMoment(ep, { type: "callout", text: "Old callout", start: 4, end: 6 });
+  const updated = M.updateMoment(ep, title.id, { text: "  New title  " });
+  assert.equal(updated.text, "New title", "text is trimmed and replaced");
+  assert.equal(updated.id, title.id, "same moment object is edited in place");
+  assert.equal(M.listMoments(ep).find((m) => m.id === title.id).text, "New title");
+  assert.equal(M.listMoments(ep).find((m) => m.id === callout.id).text, "Old callout", "other moments untouched");
+  // The edited text renders at the moment's scheduled time.
+  assert.deepEqual(M.activeMoments(ep, 2).map((m) => m.text), ["New title"]);
+});
+
+test("updateMoment can retime a moment and re-validates the window", () => {
+  const ep = E.createEpisode({});
+  const m = M.addMoment(ep, { type: "callout", text: "Ref", start: 4, end: 6 });
+  assert.ok(M.updateMoment(ep, m.id, { start: "0:02", end: "0:05" }), "valid retime succeeds");
+  assert.deepEqual([m.start, m.end], [2, 5]);
+  assert.equal(M.updateMoment(ep, m.id, { end: 2 }), null, "end <= start is rejected");
+  assert.equal(M.updateMoment(ep, m.id, { start: "nope" }), null, "unparseable time is rejected");
+  assert.deepEqual([m.start, m.end], [2, 5], "a rejected edit leaves the moment unchanged");
+});
+
+test("updateMoment rejects empty text and unknown ids", () => {
+  const ep = E.createEpisode({});
+  const m = M.addMoment(ep, { type: "title", text: "Keep", start: 0, end: 2 });
+  assert.equal(M.updateMoment(ep, m.id, { text: "   " }), null, "a text moment cannot be emptied");
+  assert.equal(m.text, "Keep");
+  assert.equal(M.updateMoment(ep, "moment-does-not-exist", { text: "x" }), null);
+});
+
 test("formatTime renders M:SS", () => {
   assert.equal(M.formatTime(0), "0:00");
   assert.equal(M.formatTime(3), "0:03");

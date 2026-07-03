@@ -81,6 +81,28 @@
     return true;
   }
 
+  // Edit an existing moment in place: change its text (title/callout/caption)
+  // and/or its start/end times. Only the provided fields change; a text-bearing
+  // moment cannot be emptied, and any time change is re-validated (finite,
+  // end > start) so an edit can never leave a moment in a broken state. Image
+  // moments keep their PNG — only their timing can be edited. Returns the
+  // updated moment, or null when the id is unknown or the change is invalid.
+  function updateMoment(episode, id, fields) {
+    const m = ensureMoments(episode).find((x) => x.id === id);
+    if (!m) return null;
+    const f = fields || {};
+    const changingText = f.text != null && m.type !== "image";
+    const nextText = changingText ? String(f.text).trim() : m.text;
+    const nextStart = f.start != null ? parseTime(f.start) : m.start;
+    const nextEnd = f.end != null ? parseTime(f.end) : m.end;
+    if (changingText && !nextText) return null;
+    if (!Number.isFinite(nextStart) || !Number.isFinite(nextEnd) || nextEnd <= nextStart) return null;
+    if (m.type !== "image") m.text = nextText;
+    m.start = nextStart;
+    m.end = nextEnd;
+    return m;
+  }
+
   // Copy of the episode's moments, ordered by start time (stable for the UI list).
   function listMoments(episode) {
     return ensureMoments(episode).slice().sort((a, b) => a.start - b.start || a.end - b.end);
@@ -102,6 +124,7 @@
     validateMoment,
     addMoment,
     removeMoment,
+    updateMoment,
     listMoments,
     activeMoments,
   };

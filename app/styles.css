@@ -355,11 +355,22 @@ body {
 .moment-kind.image { background: rgba(236, 72, 153, 0.6); }
 .moment-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .moment-range { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.moment-remove {
+.moment-remove,
+.moment-edit,
+.moment-edit-save {
   background: transparent; border: 1px solid var(--line); color: var(--muted);
   border-radius: 6px; padding: 3px 8px; font-size: 12px; cursor: pointer;
 }
-.moment-remove:hover { color: var(--ink); border-color: var(--muted); }
+.moment-remove:hover,
+.moment-edit:hover { color: var(--ink); border-color: var(--muted); }
+.moment-edit-save {
+  background: rgba(108, 140, 255, 0.17); border-color: var(--accent); color: var(--ink); font-weight: 600;
+}
+.moment-edit-save:hover { background: rgba(108, 140, 255, 0.3); }
+.moment-edit-input {
+  flex: 1; min-width: 0; background: #10131d; color: var(--ink);
+  border: 1px solid var(--accent); border-radius: 6px; padding: 5px 8px; font-size: 13px;
+}
 
 /* Scrub bar under the transport ------------------------------------------- */
 .scrub-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
