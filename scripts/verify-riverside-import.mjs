@@ -276,14 +276,18 @@ const browserExpression = `
   assert(hostVid.src && hostVid.src !== hostSrcBefore, "generated-link: the Host decoder should switch to the newly imported track");
   await waitFor(() => hostVid.readyState >= 2 && hostVid.videoWidth > 0, "generated-link: the new Host track should decode", 400);
 
-  // ── (4) The sample-link helper fills the field with the declared link. ──
+  // ── (4) "Use sample link" starts the episode in ONE click (active step #204):
+  //        it fills the declared link AND imports it, populating Host/Guest 1/
+  //        Guest 2 and rendering the preview with NO separate Import click. Prove
+  //        it from a cleared episode so the one click is solely responsible. ──
+  document.querySelector("#new-episode").click();
+  await waitFor(() => decoderCount() === 0, "new episode should clear the imported tracks first");
+  await waitFor(() => document.querySelector("#export").disabled, "export disabled on the empty episode");
   document.querySelector("#riverside-use-sample").click();
   assert(document.querySelector("#riverside-link").value.trim() === DECLARED, "Use sample link should fill the declared link");
-  const srcBeforeSample = document.querySelector('video[data-speaker="host"]').src;
-  document.querySelector("#riverside-import-btn").click();
-  await waitFor(() => document.querySelector('video[data-speaker="host"]').src !== srcBeforeSample,
-    "use-sample: a fresh import should replace the Host source", 400);
   await waitImported(3, "use-sample");
+  await waitFor(() => !document.querySelector("#export").disabled, "use-sample: Export should be enabled after the one-click import");
+  await assertPresetComposition("use-sample");
 
   // ── (5) UNSUPPORTED LINK: visible error, imported setup NOT wiped. ──
   const beforeCount = decoderCount();

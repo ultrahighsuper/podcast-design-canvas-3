@@ -429,9 +429,13 @@
   }
   importBtn.addEventListener("click", function () { importFromLink($("riverside-link").value); });
   $("riverside-use-sample").addEventListener("click", function () {
-    $("riverside-link").value = $("riverside-sample-link").textContent.trim();
+    // One click starts an episode from the bundled sample: fill the field AND
+    // import, so choosing "Use sample link" resolves the sample's speaker tracks
+    // and renders the preview immediately — no separate Import click required.
+    const sample = $("riverside-sample-link").textContent.trim();
+    $("riverside-link").value = sample;
     showRiversideError("");
-    setRiversideStatus("Sample link filled in — click Import from link.");
+    importFromLink(sample);
   });
 
   // Scrub bar: jump the shared preview timeline to any time — scheduled
